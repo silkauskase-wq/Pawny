@@ -217,8 +217,8 @@
   <div class="hero">
     <div>
       <span class="pill">GYVŪNAI PROGAI, NE VISAM GYVENIMUI</span>
-      <h1>Gyvūnas tavo šventei, pamokai ar filmavimui — vienu paspaudimu.</h1>
-      <p class="lead">Pawny sujungia tave su patikrintais gyvūnų laikytojais visoje Lietuvoje — nuo ponio gimtadieniui iki driežo pamokai mokykloje.</p>
+      <h1>Gyvūnas tavo šventei, pamokai ar filmavimui — keliais paspaudimais.</h1>
+      <p class="lead">Pawny sujungia tave su gyvūnų laikytojais visoje Lietuvoje — nuo ponio gimtadieniui iki driežo pamokai mokykloje.</p>
       <div class="hero-ctas">
         <button class="btn btn-dark btn-lg" onclick="showView('browse')">Naršyti gyvūnus</button>
         <button class="btn btn-outline btn-lg" onclick="showView('register')">Turiu gyvūną — prisijungti</button>
@@ -296,6 +296,7 @@
     <p>Filtruok pagal tai, kas tau patogiau</p>
   </div>
   <div class="tabs" id="tabs"></div>
+  <div class="tabs" id="speciesTabs" style="margin-top:-16px;"></div>
   <div class="grid" id="grid"></div>
   <div class="cta-band">
     <div>
@@ -510,9 +511,22 @@ var TABS = [
   {id:"globa", label:"Laikina globa"}
 ];
 
+var SPECIES_TABS = [
+  {id:"all", label:"Visų rūšių"},
+  {id:"pony", label:"Poniai"},
+  {id:"goat", label:"Ožkos"},
+  {id:"pig", label:"Kiaulytės"},
+  {id:"dog", label:"Šunys"},
+  {id:"alpaca", label:"Alpakos"},
+  {id:"lizard", label:"Driežai"},
+  {id:"snake", label:"Gyvatės"},
+  {id:"insect", label:"Vabzdžiai"}
+];
+
 var state = {
   view:"landing",
   cat:"all",
+  species:"all",
   animals: [],
   dbStatus: "connecting", // connecting | ready | unavailable
   selectedTravel: "atvaziuoja",
@@ -532,7 +546,7 @@ function showView(v){
   document.querySelectorAll(".navlinks button").forEach(function(b){
     b.classList.toggle("active", b.getAttribute("data-nav")===v);
   });
-  if(v==="browse"){ renderTabs(); renderGrid(); }
+  if(v==="browse"){ renderTabs(); renderSpeciesTabs(); renderGrid(); }
   if(v==="mylistings"){ renderMyListings(); }
   window.scrollTo({top:0, behavior:"smooth"});
 }
@@ -552,6 +566,21 @@ function renderTabs(){
   });
 }
 
+function renderSpeciesTabs(){
+  var el = document.getElementById("speciesTabs");
+  el.innerHTML = "";
+  SPECIES_TABS.forEach(function(t){
+    var b = document.createElement("button");
+    b.className = "tab" + (state.species===t.id ? " active" : "");
+    b.type = "button";
+    b.style.fontSize = "12px";
+    b.style.padding = "8px 14px";
+    b.textContent = t.label;
+    b.onclick = function(){ state.species = t.id; renderSpeciesTabs(); renderGrid(); };
+    el.appendChild(b);
+  });
+}
+
 function renderGrid(){
   var el = document.getElementById("grid");
   el.innerHTML = "";
@@ -565,7 +594,11 @@ function renderGrid(){
     return;
   }
 
-  var list = state.animals.filter(function(a){ return state.cat==="all" || a.cat===state.cat; });
+  var list = state.animals.filter(function(a){
+    var catOk = state.cat==="all" || a.cat===state.cat;
+    var speciesOk = state.species==="all" || a.icon_key===state.species;
+    return catOk && speciesOk;
+  });
 
   if(list.length === 0){
     el.innerHTML = '<div style="grid-column:1/-1; text-align:center; color:var(--muted); font-size:13px; padding:40px 0;">Šioje kategorijoje kol kas nėra gyvūnų.</div>';
@@ -616,9 +649,63 @@ function openModal(a){
       '<span class="type">'+a.type+'</span>'+
       '<div class="chips"><span class="chip '+travelClass+'">'+travelLabel+'</span>'+chips+'</div>'+
       '<div class="desc">'+(a.description || "")+'</div>'+
-      '<div class="price-row"><span class="price">'+a.price+'</span><button type="button" class="btn btn-dark" onclick="closeModal()">Rezervuoti</button></div>'+
+      '<div class="price-row"><span class="price">'+a.price+'</span><button type="button" class="btn btn-dark" id="openReqBtn" onclick="showRequestForm(\''+a.id+'\', \''+a.name.replace(/'/g,"\\'")+'\')">Siųsti užklausą</button></div>'+
+      '<div id="reqFormWrap"></div>'+
     '</div>';
   document.getElementById("modal-backdrop").classList.remove("hidden");
+}
+
+function showRequestForm(animalId, animalName){
+  document.getElementById("openReqBtn").style.display = "none";
+  var wrap = document.getElementById("reqFormWrap");
+  wrap.innerHTML =
+    '<div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border); display:flex; flex-direction:column; gap:12px;">'+
+      '<div style="font-size:13px; font-weight:700;">Užklausa dėl '+animalName+'</div>'+
+      '<div class="row2">'+
+        '<div class="field" style="margin-top:0;"><label>Data</label><input type="date" id="req-date"></div>'+
+        '<div class="field" style="margin-top:0;"><label>Laikas</label><input type="text" id="req-time" placeholder="pvz. 14:00"></div>'+
+      '</div>'+
+      '<div class="field" style="margin-top:0;"><label>Tavo el. paštas ar telefonas</label><input type="text" id="req-contact" placeholder="kad laikytojas galėtų susisiekti"></div>'+
+      '<div class="field" style="margin-top:0;"><label>Žinutė (nebūtina)</label><textarea id="req-msg" rows="3" style="border:1px solid var(--border); background:var(--surface); border-radius:12px; padding:12px 14px; font-size:14px; font-family:inherit; resize:vertical;" placeholder="Proga, vietos adresas, žmonių skaičius..."></textarea></div>'+
+      '<button type="button" class="submitbtn" style="margin-top:0;" onclick="submitRequest(\''+animalId+'\')">Siųsti užklausą</button>'+
+      '<div class="toast" id="reqToast"></div>'+
+    '</div>';
+}
+
+async function submitRequest(animalId){
+  var date = document.getElementById("req-date").value;
+  var time = document.getElementById("req-time").value.trim();
+  var contact = document.getElementById("req-contact").value.trim();
+  var msg = document.getElementById("req-msg").value.trim();
+  var toast = document.getElementById("reqToast");
+
+  if(!contact){
+    toast.textContent = "Įrašyk el. paštą ar telefoną, kad laikytojas galėtų susisiekti.";
+    toast.style.background = "var(--rose-bg)"; toast.style.color = "var(--rose)";
+    toast.classList.add("show");
+    return;
+  }
+  if(!supabaseClient){ return; }
+
+  var row = {
+    animal_id: animalId,
+    requester_email: contact,
+    event_date: date || null,
+    time_note: time,
+    message: msg,
+    requester_user_id: currentUser ? currentUser.id : null
+  };
+
+  try{
+    var res = await supabaseClient.from("requests").insert([row]);
+    if(res.error){ throw res.error; }
+    document.getElementById("reqFormWrap").innerHTML =
+      '<div style="margin-top:16px; padding:16px; background:var(--green-bg); color:var(--green); border-radius:12px; font-size:13px; font-weight:600;">Užklausa išsiųsta! Laikytojas susisieks tiesiogiai nurodytu kontaktu.</div>';
+  }catch(e){
+    toast.textContent = "Nepavyko išsiųsti užklausos — pabandyk dar kartą.";
+    toast.style.background = "var(--rose-bg)"; toast.style.color = "var(--rose)";
+    toast.classList.add("show");
+  }
 }
 
 function closeModal(){
@@ -831,9 +918,25 @@ async function renderMyListings(){
         '<button class="btn btn-dark" onclick="showView(\'register\')">Kelti gyvūną</button></div>';
       return;
     }
+
+    var animalIds = list.map(function(a){ return a.id; });
+    var reqRes = await supabaseClient.from("requests").select("*").in("animal_id", animalIds).order("created_at",{ascending:false});
+    var allRequests = (reqRes && reqRes.data) ? reqRes.data : [];
+
     el.innerHTML = "";
     list.forEach(function(a){
       var ic = ICONS[a.icon_key] || ICONS.other;
+      var myReqs = allRequests.filter(function(r){ return r.animal_id === a.id; });
+      var reqListHtml = myReqs.length === 0 ? '<div style="font-size:12px; color:var(--muted); margin-top:10px;">Užklausų dar nėra.</div>' :
+        '<div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">' +
+        myReqs.map(function(r){
+          return '<div style="background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:10px; font-size:12px;">'+
+            '<div style="font-weight:700;">'+r.requester_email+'</div>'+
+            (r.event_date ? '<div style="color:var(--muted); margin-top:2px;">Data: '+r.event_date+(r.time_note ? ' · '+r.time_note : '')+'</div>' : '')+
+            (r.message ? '<div style="color:var(--muted); margin-top:2px;">'+r.message+'</div>' : '')+
+          '</div>';
+        }).join("") + '</div>';
+
       var card = document.createElement("div");
       card.className = "card";
       card.innerHTML =
@@ -841,10 +944,13 @@ async function renderMyListings(){
           '<div class="thumb" style="background-image:url(\''+a.photo+'\'); background-size:cover; background-position:center;"></div>' :
           '<div class="thumb" style="background:'+ic.bg+';"><svg viewBox="0 0 24 24" fill="none" stroke="'+ic.stroke+'" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">'+ic.path+'</svg></div>')+
         '<div class="cardbody">'+
-          '<div class="cardtop"><span class="name">'+a.name+'</span></div>'+
+          '<div class="cardtop"><span class="name">'+a.name+'</span>'+
+            (myReqs.length > 0 ? '<span class="rating" style="color:var(--accent);">'+myReqs.length+' užklausa(-os)</span>' : '')+
+          '</div>'+
           '<span class="type">'+a.type+'</span>'+
           '<div class="price"><span>'+a.price+'</span></div>'+
-          '<button type="button" class="btn btn-outline" style="margin-top:10px; width:100%; color:var(--rose); border-color:var(--rose);" onclick="deleteListing(\''+a.id+'\')">Ištrinti</button>'+
+          reqListHtml +
+          '<button type="button" class="btn btn-outline" style="margin-top:10px; width:100%; color:var(--rose); border-color:var(--rose);" onclick="deleteListing(\''+a.id+'\')">Ištrinti skelbimą</button>'+
         '</div>';
       el.appendChild(card);
     });

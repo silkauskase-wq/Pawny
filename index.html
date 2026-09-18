@@ -202,7 +202,7 @@
       <button data-nav="landing" class="active" onclick="showView('landing')">Pradžia</button>
       <button data-nav="browse" onclick="showView('browse')">Gyvūnai</button>
       <button data-nav="map" onclick="showView('map')">Žemėlapis</button>
-      <button data-nav="register" onclick="showView('register')">Tapti partneriu</button>
+      <button data-nav="register" onclick="openAddForm()">Tapti partneriu</button>
       <button data-nav="mylistings" onclick="showView('mylistings')">Mano skelbimai</button>
     </div>
     <div class="navcta">
@@ -221,7 +221,7 @@
       <p class="lead">Pawny sujungia tave su gyvūnų laikytojais visoje Lietuvoje — nuo ponio gimtadieniui iki driežo pamokai mokykloje.</p>
       <div class="hero-ctas">
         <button class="btn btn-dark btn-lg" onclick="showView('browse')">Naršyti gyvūnus</button>
-        <button class="btn btn-outline btn-lg" onclick="showView('register')">Turiu gyvūną — prisijungti</button>
+        <button class="btn btn-outline btn-lg" onclick="openAddForm()">Turiu gyvūną — prisijungti</button>
       </div>
     </div>
     <div class="scenegrid">
@@ -303,7 +303,7 @@
       <h3>Turi ūkį, prieglaudą ar egzotinį augintinį?</h3>
       <p>Prisijunk kaip partneris ir uždirbk iš to, ką jau darai.</p>
     </div>
-    <button class="btn btn-dark btn-lg" style="background:var(--ink-contrast); color:var(--ink);" onclick="showView('register')">Tapti partneriu</button>
+    <button class="btn btn-dark btn-lg" style="background:var(--ink-contrast); color:var(--ink);" onclick="openAddForm()">Tapti partneriu</button>
   </div>
 </section>
 
@@ -404,7 +404,7 @@
 
 <section id="view-register" class="wrap hidden">
   <div class="formwrap">
-    <h2>Kelti gyvūno skelbimą</h2>
+    <h2 id="formTitle">Kelti gyvūno skelbimą</h2>
     <p>Užpildyk formą — patikrinsime dokumentus ir per 1–2 darbo dienas skelbimas bus matomas platformoje.</p>
 
     <label class="dropzone" id="photoDropzone" style="cursor:pointer; display:block;">
@@ -468,7 +468,7 @@
       <input id="p-docs" type="file">
     </div>
 
-    <button class="submitbtn" onclick="submitListing()">Pateikti peržiūrai</button>
+    <button class="submitbtn" id="formSubmitBtn" onclick="submitListing()">Pateikti peržiūrai</button>
     <div class="toast" id="toast">Ačiū! Gavome skelbimą ir susisieksime per 1–2 darbo dienas.</div>
   </div>
 </section>
@@ -535,7 +535,8 @@ var state = {
   dbStatus: "connecting", // connecting | ready | unavailable
   selectedTravel: "atvaziuoja",
   selectedTags: [],
-  selectedPhoto: null
+  selectedPhoto: null,
+  editingAnimalId: null
 };
 
 function toggleMenu(){
@@ -763,6 +764,62 @@ function handlePhotoSelect(input){
   reader.readAsDataURL(file);
 }
 
+function resetRegisterForm(){
+  document.getElementById("p-name").value = "";
+  document.getElementById("p-name").style.borderColor = "";
+  document.getElementById("p-species").selectedIndex = 0;
+  document.getElementById("p-price").value = "";
+  document.getElementById("p-area").value = "";
+  state.selectedTags = [];
+  document.querySelectorAll("[data-tag]").forEach(function(b){ b.classList.remove("selected"); });
+  state.selectedTravel = "atvaziuoja";
+  document.querySelectorAll("[data-travel]").forEach(function(b){ b.classList.remove("selected"); });
+  document.querySelector('[data-travel="atvaziuoja"]').classList.add("selected");
+  state.selectedPhoto = null;
+  document.getElementById("photoPreview").style.display = "none";
+  document.getElementById("photoPreview").src = "";
+  document.getElementById("photoDropzoneText").textContent = "Įkelti nuotrauką";
+  document.getElementById("p-photo").value = "";
+  state.editingAnimalId = null;
+  document.getElementById("formTitle").textContent = "Kelti gyvūno skelbimą";
+  document.getElementById("formSubmitBtn").textContent = "Pateikti peržiūrai";
+}
+
+function openAddForm(){
+  resetRegisterForm();
+  showView("register");
+}
+
+function openEditForm(a){
+  resetRegisterForm();
+  state.editingAnimalId = a.id;
+  document.getElementById("p-name").value = a.name || "";
+  var sel = document.getElementById("p-species");
+  for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value === a.icon_key){ sel.selectedIndex = i; break; } }
+  document.getElementById("p-price").value = (a.price && a.price !== "Susitarti") ? a.price : "";
+  document.getElementById("p-area").value = a.area || "";
+  var travelBtn = document.querySelector('[data-travel="'+a.cat+'"]');
+  if(travelBtn){
+    document.querySelectorAll("[data-travel]").forEach(function(b){ b.classList.remove("selected"); });
+    travelBtn.classList.add("selected");
+    state.selectedTravel = a.cat;
+  }
+  (a.tags || []).forEach(function(tag){
+    var tagBtn = document.querySelector('[data-tag="'+tag+'"]');
+    if(tagBtn){ tagBtn.classList.add("selected"); state.selectedTags.push(tag); }
+  });
+  if(a.photo){
+    state.selectedPhoto = a.photo;
+    var preview = document.getElementById("photoPreview");
+    preview.src = a.photo;
+    preview.style.display = "block";
+    document.getElementById("photoDropzoneText").textContent = "Nuotrauka pasirinkta — paspausk, kad pakeistum";
+  }
+  document.getElementById("formTitle").textContent = "Redaguoti skelbimą";
+  document.getElementById("formSubmitBtn").textContent = "Atnaujinti skelbimą";
+  showView("register");
+}
+
 async function submitListing(){
   if(!currentUser){
     alert("Kad galėtum kelti skelbimą, pirma prisijunk arba užsiregistruok.");
@@ -790,38 +847,37 @@ async function submitListing(){
     tags: state.selectedTags.slice(),
     price: price,
     area: area,
-    description: "Naujas partneris platformoje" + (area ? " (" + area + ")" : "") + " — susisiek dėl daugiau informacijos ir rezervacijos.",
-    sort_order: Date.now(),
-    photo: state.selectedPhoto,
-    owner_id: currentUser.id
+    photo: state.selectedPhoto
   };
+  if(!state.editingAnimalId){
+    row.description = "Naujas partneris platformoje" + (area ? " (" + area + ")" : "") + " — susisiek dėl daugiau informacijos ir rezervacijos.";
+    row.sort_order = Date.now();
+    row.owner_id = currentUser.id;
+  }
 
-  var btn = document.querySelector(".submitbtn");
+  var btn = document.getElementById("formSubmitBtn");
   var originalText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = "Siunčiama...";
+  btn.textContent = state.editingAnimalId ? "Atnaujinama..." : "Siunčiama...";
 
   try{
     if(!supabaseClient){ throw new Error("no-db"); }
-    var res = await supabaseClient.from("animals").insert([row]);
+    var res;
+    if(state.editingAnimalId){
+      res = await supabaseClient.from("animals").update(row).eq("id", state.editingAnimalId).eq("owner_id", currentUser.id);
+    } else {
+      res = await supabaseClient.from("animals").insert([row]);
+    }
     if(res.error){ throw res.error; }
-    document.getElementById("toast").classList.remove("show");
-    document.getElementById("toast").textContent = "Ačiū! Gavome skelbimą ir susisieksime per 1–2 darbo dienas.";
+    var successMsg = state.editingAnimalId ? "Skelbimas atnaujintas!" : "Ačiū! Gavome skelbimą ir susisieksime per 1–2 darbo dienas.";
+    resetRegisterForm();
+    document.getElementById("toast").textContent = successMsg;
     document.getElementById("toast").style.background = "var(--green-bg)";
     document.getElementById("toast").style.color = "var(--green)";
     document.getElementById("toast").classList.add("show");
-    nameEl.value = "";
-    nameEl.style.borderColor = "";
-    document.getElementById("p-price").value = "";
-    document.getElementById("p-area").value = "";
-    state.selectedTags = [];
-    document.querySelectorAll("[data-tag]").forEach(function(b){ b.classList.remove("selected"); });
-    state.selectedPhoto = null;
-    document.getElementById("photoPreview").style.display = "none";
-    document.getElementById("photoPreview").src = "";
-    document.getElementById("photoDropzoneText").textContent = "Įkelti nuotrauką";
-    document.getElementById("p-photo").value = "";
     loadAnimals();
+    btn.disabled = false;
+    return;
   }catch(e){
     document.getElementById("toast").textContent = "Nepavyko išsaugoti skelbimo — pabandyk dar kartą.";
     document.getElementById("toast").style.background = "var(--rose-bg)";
@@ -954,7 +1010,7 @@ async function renderMyListings(){
     if(list.length === 0){
       el.innerHTML = '<div style="grid-column:1/-1; text-align:center; padding:40px 0;">'+
         '<p style="color:var(--muted); font-size:14px; margin-bottom:16px;">Dar neturi jokių skelbimų.</p>'+
-        '<button class="btn btn-dark" onclick="showView(\'register\')">Kelti gyvūną</button></div>';
+        '<button class="btn btn-dark" onclick="openAddForm()">Kelti gyvūną</button></div>';
       return;
     }
 
@@ -989,8 +1045,12 @@ async function renderMyListings(){
           '<span class="type">'+a.type+'</span>'+
           '<div class="price"><span>'+a.price+'</span></div>'+
           reqListHtml +
-          '<button type="button" class="btn btn-outline" style="margin-top:10px; width:100%; color:var(--rose); border-color:var(--rose);" onclick="deleteListing(\''+a.id+'\')">Ištrinti skelbimą</button>'+
+          '<div style="display:flex; gap:8px; margin-top:10px;">'+
+            '<button type="button" class="btn btn-outline edit-btn" style="flex:1;">Redaguoti</button>'+
+            '<button type="button" class="btn btn-outline" style="flex:1; color:var(--rose); border-color:var(--rose);" onclick="deleteListing(\''+a.id+'\')">Ištrinti</button>'+
+          '</div>'+
         '</div>';
+      card.querySelector(".edit-btn").addEventListener("click", function(){ openEditForm(a); });
       el.appendChild(card);
     });
   }catch(e){

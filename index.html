@@ -407,7 +407,11 @@
     <h2>Kelti gyvūno skelbimą</h2>
     <p>Užpildyk formą — patikrinsime dokumentus ir per 1–2 darbo dienas skelbimas bus matomas platformoje.</p>
 
-    <div class="dropzone">Įkelti nuotraukas</div>
+    <label class="dropzone" id="photoDropzone" style="cursor:pointer; display:block;">
+      <span id="photoDropzoneText">Įkelti nuotrauką</span>
+      <img id="photoPreview" style="display:none; max-width:100%; max-height:160px; border-radius:10px; margin-top:10px;">
+      <input type="file" id="p-photo" accept="image/*" style="display:none;" onchange="handlePhotoSelect(this)">
+    </label>
 
     <div class="field">
       <label for="p-name">Gyvūno vardas</label>
@@ -530,7 +534,8 @@ var state = {
   animals: [],
   dbStatus: "connecting", // connecting | ready | unavailable
   selectedTravel: "atvaziuoja",
-  selectedTags: []
+  selectedTags: [],
+  selectedPhoto: null
 };
 
 function toggleMenu(){
@@ -730,6 +735,34 @@ function pickTag(btn){
   }
 }
 
+function handlePhotoSelect(input){
+  var file = input.files && input.files[0];
+  if(!file) return;
+  if(!file.type.startsWith("image/")){ alert("Prašome pasirinkti nuotrauką."); return; }
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var img = new Image();
+    img.onload = function(){
+      var maxDim = 900;
+      var w = img.width, h = img.height;
+      if(w > h && w > maxDim){ h = Math.round(h * (maxDim / w)); w = maxDim; }
+      else if(h > maxDim){ w = Math.round(w * (maxDim / h)); h = maxDim; }
+      var canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL("image/jpeg", 0.75);
+      state.selectedPhoto = dataUrl;
+      var preview = document.getElementById("photoPreview");
+      preview.src = dataUrl;
+      preview.style.display = "block";
+      document.getElementById("photoDropzoneText").textContent = "Nuotrauka pasirinkta — paspausk, kad pakeistum";
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
 async function submitListing(){
   if(!currentUser){
     alert("Kad galėtum kelti skelbimą, pirma prisijunk arba užsiregistruok.");
@@ -759,6 +792,7 @@ async function submitListing(){
     area: area,
     description: "Naujas partneris platformoje" + (area ? " (" + area + ")" : "") + " — susisiek dėl daugiau informacijos ir rezervacijos.",
     sort_order: Date.now(),
+    photo: state.selectedPhoto,
     owner_id: currentUser.id
   };
 
@@ -782,6 +816,11 @@ async function submitListing(){
     document.getElementById("p-area").value = "";
     state.selectedTags = [];
     document.querySelectorAll("[data-tag]").forEach(function(b){ b.classList.remove("selected"); });
+    state.selectedPhoto = null;
+    document.getElementById("photoPreview").style.display = "none";
+    document.getElementById("photoPreview").src = "";
+    document.getElementById("photoDropzoneText").textContent = "Įkelti nuotrauką";
+    document.getElementById("p-photo").value = "";
     loadAnimals();
   }catch(e){
     document.getElementById("toast").textContent = "Nepavyko išsaugoti skelbimo — pabandyk dar kartą.";
